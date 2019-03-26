@@ -97,11 +97,7 @@ func (app *GaiaApp) prepForZeroHeightGenesis(ctx sdk.Context, jailWhiteList []st
 	// clear validator slash events
 	app.distrKeeper.DeleteAllValidatorSlashEvents(ctx)
 
-	// clear validator historical rewards
-	app.distrKeeper.DeleteAllValidatorHistoricalRewards(ctx)
-
 	// set context height to zero
-	height := ctx.BlockHeight()
 	ctx = ctx.WithBlockHeight(0)
 
 	// reinitialize all validators
@@ -113,17 +109,15 @@ func (app *GaiaApp) prepForZeroHeightGenesis(ctx sdk.Context, jailWhiteList []st
 		feePool.CommunityPool = feePool.CommunityPool.Add(scraps)
 		app.distrKeeper.SetFeePool(ctx, feePool)
 
-		app.distrKeeper.Hooks().AfterValidatorCreated(ctx, val.GetOperator())
+		//app.distrKeeper.Hooks().AfterValidatorCreated(ctx, val.GetOperator())
 		return false
 	})
 
-	// reinitialize all delegations
+	//reinitialize all distribution delegations
 	for _, del := range dels {
+		app.distrKeeper.DeleteDelegatorStartingInfo(ctx, del.ValidatorAddress, del.DelegatorAddress)
 		app.distrKeeper.Hooks().BeforeDelegationCreated(ctx, del.DelegatorAddress, del.ValidatorAddress)
 	}
-
-	// reset context height
-	ctx = ctx.WithBlockHeight(height)
 
 	/* Handle staking state. */
 
@@ -172,6 +166,21 @@ func (app *GaiaApp) prepForZeroHeightGenesis(ctx sdk.Context, jailWhiteList []st
 	iter.Close()
 
 	_ = app.stakingKeeper.ApplyAndReturnValidatorSetUpdates(ctx)
+
+	/* Handle fee distribution state - part 2 */
+
+	//reinitialize all distribution delegations
+	for _, del := range dels {
+		app.distrKeeper.Hooks().AfterDelegationModified(ctx, del.DelegatorAddress, del.ValidatorAddress)
+		//si := app.distrKeeper.GetDelegatorStartingInfo(ctx, del.ValidatorAddress, del.DelegatorAddress)
+		//fmt.Printf("debug si: %v\n", si)
+		//app.stakingKeeper.Hooks().AfterDelegationModified(ctx, del.DelegatorAddress, del.ValidatorAddress)
+
+		//validator := app.stakingKeeper.Validator(ctx, del.ValidatorAddress)
+		//delegation := app.stakingKeeper.Delegation(ctx, del.DelegatorAddress, del.ValidatorAddress)
+		//stake := validator.ShareTokensTruncated(delegation.GetShares())
+		//app.distrKeeper.SetDelegatorStartingInfo(ctx, del.ValidatorAddress, del.DelegatorAddress, types.NewDelegatorStartingInfo(0, stake, 0))
+	}
 
 	/* Handle slashing state. */
 
